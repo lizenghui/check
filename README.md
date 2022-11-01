@@ -2,9 +2,13 @@
 self-use
 
 check netflix
+```
 ./check -c <clash_config> -t 0
+```
 check google & youtube
+```
 ./check -c <clash_config> -t 1
+```
 
 generate clash config
 ```
