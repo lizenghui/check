@@ -20,7 +20,7 @@ jobs:
         go-version: 1.18
 
     - name: Build
-      run: go build -v ./...
+      run: GOOS=linux; GOARCH=amd64; go build -o check -v ./...
 
     - name: Release
       uses: softprops/action-gh-release@v1
