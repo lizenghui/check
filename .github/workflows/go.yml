@@ -22,4 +22,12 @@ jobs:
     - name: Build
       run: go build -v ./...
 
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v0.0.1
+        files:
+          check
+          
+
 
