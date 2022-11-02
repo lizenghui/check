@@ -71,9 +71,15 @@ func requestURL(requrl string) string {
 }
 
 func init() {
+
 	flag.StringVar(&config_path, "c", "config.yaml", "config file;")
 	flag.StringVar(&port, "p", "18081", "proxy port;")
 	flag.StringVar(&ctype, "t", "0", "check type; \n\t0:check netflix;\n\t1:check google&youtube premium US\n")
+
+	flag.Usage = func() {
+		flag.PrintDefaults()
+		fmt.Println("\ngenerate clash config:\ngoogle&youtube:\n----------\ngrep \"youtube:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort && echo \" \" && \\\ngrep \"google:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\nnetflix:\n----------\ngrep \"netflix:Y\" 0.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort")
+	}
 	flag.Parse()
 
 	proxy_url += port
