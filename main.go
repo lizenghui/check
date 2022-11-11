@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
+
 	"log"
 	"net"
 	"net/http"
@@ -66,7 +66,7 @@ func requestURL(requrl string) string {
 		return "Error"
 	}
 	defer resp.Body.Close()
-	content, _ := ioutil.ReadAll(resp.Body)
+	content, _ := io.ReadAll(resp.Body)
 	return strings.Trim(string(content), "\n")
 }
 
