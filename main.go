@@ -1,6 +1,7 @@
 package main
 
 import (
+	"check/validator"
 	"context"
 	"flag"
 	"fmt"
@@ -12,14 +13,12 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/hub/executor"
 	chttp "github.com/Dreamacro/clash/listener/http"
-	"github.com/sjlleo/netflix-verify/verify"
 )
 
 var proxy constant.Proxy
@@ -197,24 +196,9 @@ func main() {
 
 		//Netflix检测
 		if ctype == "0" {
-			r := verify.NewVerify(verify.Config{
-				Proxy: "http://" + proxy_url,
-			})
+			vs := validator.NewVerify(proxy_url)
+			res = "\tnetflix:" + vs.Netflix()
 
-			switch r.Res[1].StatusCode {
-			case 2:
-				unblock = true
-				res = "\tnetflix:Y\t完整解锁，可观看全部影片，地域信息：" + r.Res[1].CountryName
-			case 1:
-				unblock = false
-				res = "\t部分解锁，可观看自制剧，地域信息：" + r.Res[1].CountryName
-			case 0:
-				unblock = false
-				res = "\t完全不支持Netflix"
-			default:
-				unblock = false
-				res = strconv.Itoa(r.Res[1].StatusCode)
-			}
 		} else {
 			unblock = true
 			if unblock {

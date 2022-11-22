@@ -2,10 +2,7 @@ module check
 
 go 1.19
 
-require (
-	github.com/Dreamacro/clash v1.11.12
-	github.com/sjlleo/netflix-verify v0.0.0-20220920074221-6e25cfde96b9
-)
+require github.com/Dreamacro/clash v1.11.12
 
 require (
 	github.com/gofrs/uuid v4.3.1+incompatible // indirect
