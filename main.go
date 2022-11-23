@@ -177,8 +177,7 @@ func main() {
 	for node, server := range nodes {
 
 		var (
-			unblock bool
-			res     string
+			res string
 		)
 
 		if server.Type() != constant.Shadowsocks && server.Type() != constant.ShadowsocksR && server.Type() != constant.Snell && server.Type() != constant.Socks5 && server.Type() != constant.Http && server.Type() != constant.Vmess && server.Type() != constant.Trojan {
@@ -190,26 +189,29 @@ func main() {
 		ip := getIpInfo()
 		str := fmt.Sprintf("%d.node: %s", index, node)
 
-		// if ip == "Error" {
-		// 	continue
-		// }
+		re := regexp.MustCompile("美|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States")
 
-		//Netflix检测
-		if ctype == "0" {
+		if re.MatchString(node) {
+			res += "\tyoutube:" + youtube_premium()
+		} else {
+			res += "\t"
+		}
+
+		if ctype == "0" && !re.MatchString(node) {
 			vs := validator.NewVerify(proxy_url)
 			res = "\tnetflix:" + vs.Netflix()
-
 		} else {
-			unblock = true
-			if unblock {
-				res += "\tgoogle:" + google()
+			continue
+		}
 
-				re := regexp.MustCompile("美|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States")
-				if re.MatchString(node) {
-					res += "\tyoutube:" + youtube_premium()
-				} else {
-					res += "\t"
-				}
+		if ctype == "1" {
+
+			res += "\tgoogle:" + google()
+
+			if re.MatchString(node) {
+				res += "\tyoutube:" + youtube_premium()
+			} else {
+				res += "\t"
 			}
 		}
 		logger.Printf("%s%s\t%s\n", str, res, ip)

@@ -1,7 +1,6 @@
 package validator
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -61,7 +60,7 @@ func (vs *Ver) Netflix() string {
 	} else if resp.StatusCode == 200 {
 		return "Y"
 	} else {
-		fmt.Println(resp)
+		// fmt.Println(resp)
 		return "unknow"
 	}
 
