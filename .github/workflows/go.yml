@@ -20,14 +20,14 @@ jobs:
         go-version: 1.19
 
     - name: Build
-      run: GOOS=linux; GOARCH=amd64; go build -o check -v 
+      run: GOOS=linux; GOARCH=amd64; go build -o check_linux_amd64 -v 
 
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v0.1.2
         files:
-          check
+          check_linux_amd64
           
 
 
