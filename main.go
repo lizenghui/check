@@ -191,7 +191,6 @@ func main() {
 
 		re := regexp.MustCompile("美|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States")
 
-		
 
 		if ctype == "0" && !re.MatchString(node) {
 			vs := validator.NewVerify(proxy_url)
@@ -199,15 +198,13 @@ func main() {
 		}
 
 		if ctype == "1" {
-
 			res += "\tgoogle:" + google()
-
-			if re.MatchString(node) {
-				res += "\tyoutube:" + youtube_premium()
-			} else {
-				res += "\t"
-			}
 		}
+		
+		if re.MatchString(node) {
+			res += "\tyoutube:" + youtube_premium()
+		}
+		
 		logger.Printf("%s%s\t%s\n", str, res, ip)
 
 		index++
