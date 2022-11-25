@@ -200,8 +200,6 @@ func main() {
 		if ctype == "0" && !re.MatchString(node) {
 			vs := validator.NewVerify(proxy_url)
 			res = "\tnetflix:" + vs.Netflix()
-		} else {
-			continue
 		}
 
 		if ctype == "1" {
