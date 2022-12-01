@@ -24,7 +24,8 @@ import (
 var proxy constant.Proxy
 var config_path string
 var port string
-var ctype string
+var ctype, custom_url string
+
 var proxy_url = "127.0.0.1:"
 var fw os.File
 var logger *log.Logger
@@ -74,6 +75,7 @@ func init() {
 	flag.StringVar(&config_path, "c", "config.yaml", "config file;")
 	flag.StringVar(&port, "p", "18081", "proxy port;")
 	flag.StringVar(&ctype, "t", "0", "check type; \n\t0:check netflix;\n\t1:check google&youtube premium US\n")
+	flag.StringVar(&custom_url, "u", "", "custom probe url")
 
 	flag.Usage = func() {
 		flag.PrintDefaults()
@@ -189,8 +191,12 @@ func main() {
 		ip := getIpInfo()
 		str := fmt.Sprintf("%d.node: %s", index, node)
 
-		re := regexp.MustCompile("美|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States")
+		if custom_url != "" {
+			vs := validator.NewVerify(proxy_url)
+			res = "\t" + custom_url + ":" + vs.CustomProbe(custom_url)
+		}
 
+		re := regexp.MustCompile("美|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States")
 
 		if ctype == "0" && !re.MatchString(node) {
 			vs := validator.NewVerify(proxy_url)
@@ -200,11 +206,11 @@ func main() {
 		if ctype == "1" {
 			res += "\tgoogle:" + google()
 		}
-		
+
 		if re.MatchString(node) {
 			res += "\tyoutube:" + youtube_premium()
 		}
-		
+
 		logger.Printf("%s%s\t%s\n", str, res, ip)
 
 		index++

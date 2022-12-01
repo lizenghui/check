@@ -65,3 +65,20 @@ func (vs *Ver) Netflix() string {
 	}
 
 }
+
+func (vs *Ver) CustomProbe(custom_url string) string {
+
+	content, resp := requestURL(custom_url, vs.proxy_url)
+
+	if content == "Error" {
+		return "ERR"
+	}
+
+	if resp.StatusCode == 200 {
+		return "Y"
+	} else {
+		// fmt.Println(resp)
+		return "N"
+	}
+
+}
