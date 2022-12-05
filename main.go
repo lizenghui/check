@@ -22,9 +22,12 @@ import (
 )
 
 var proxy constant.Proxy
-var config_path string
-var port string
-var ctype, custom_url string
+
+type Args struct {
+	config_path, port, ctype, custom_url string
+}
+
+var args = Args{}
 
 var proxy_url = "127.0.0.1:"
 var fw os.File
@@ -72,10 +75,10 @@ func requestURL(requrl string) string {
 
 func init() {
 
-	flag.StringVar(&config_path, "c", "config.yaml", "config file;")
-	flag.StringVar(&port, "p", "18081", "proxy port;")
-	flag.StringVar(&ctype, "t", "0", "check type; \n\t0:check netflix;\n\t1:check google&youtube premium US\n")
-	flag.StringVar(&custom_url, "u", "", "custom probe url")
+	flag.StringVar(&args.config_path, "c", "config.yaml", "config file;")
+	flag.StringVar(&args.port, "p", "18081", "proxy port;")
+	flag.StringVar(&args.ctype, "t", "0", "check type; \n\t0:check netflix;\n\t1:check google&youtube premium US\n")
+	flag.StringVar(&args.custom_url, "u", "", "custom probe url")
 
 	flag.Usage = func() {
 		flag.PrintDefaults()
@@ -83,12 +86,12 @@ func init() {
 	}
 	flag.Parse()
 
-	proxy_url += port
+	proxy_url += args.port
 	fmt.Println(proxy_url)
 
 	log.SetFlags(0)
 
-	fw, _ := os.OpenFile(ctype+".check.log", os.O_TRUNC|os.O_RDWR|os.O_CREATE, 0666)
+	fw, _ := os.OpenFile(args.ctype+".check.log", os.O_TRUNC|os.O_RDWR|os.O_CREATE, 0666)
 	logger = log.New(io.MultiWriter(os.Stdout, fw), "", 0)
 }
 
@@ -130,15 +133,15 @@ func google() string {
 }
 
 func main() {
-	_, err := os.Stat(config_path)
+	_, err := os.Stat(args.config_path)
 
 	if nil != err {
 		fmt.Println("config illegal")
-		fmt.Println(config_path)
+		fmt.Println(args.config_path)
 		os.Exit(1)
 	}
 
-	config, err := executor.ParseWithPath(config_path)
+	config, err := executor.ParseWithPath(args.config_path)
 
 	if err != nil {
 		fmt.Printf("%s\n", err.Error())
@@ -191,19 +194,19 @@ func main() {
 		ip := getIpInfo()
 		str := fmt.Sprintf("%d.node: %s", index, node)
 
-		if custom_url != "" {
+		if args.custom_url != "" {
 			vs := validator.NewVerify(proxy_url)
-			res = "\t" + custom_url + ":" + vs.CustomProbe(custom_url)
+			res = "\t" + args.custom_url + ":" + vs.CustomProbe(args.custom_url)
 		}
 
 		re := regexp.MustCompile("美|波特兰|达拉斯|俄勒冈|凤凰城|费利蒙|硅谷|拉斯维加斯|洛杉矶|圣何塞|圣克拉拉|西雅图|芝加哥|US|United States")
 
-		if ctype == "0" && !re.MatchString(node) {
+		if args.ctype == "0" && !re.MatchString(node) {
 			vs := validator.NewVerify(proxy_url)
 			res = "\tnetflix:" + vs.Netflix()
 		}
 
-		if ctype == "1" {
+		if args.ctype == "1" {
 			res += "\tgoogle:" + google()
 		}
 
