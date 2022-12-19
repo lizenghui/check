@@ -45,7 +45,7 @@ func requestURL(requrl string, proxy_url string) (string, *http.Response) {
 }
 
 func (vs *Ver) Netflix() string {
-	netflixUrl := "https://www.netflix.com/title/81215567"
+	netflixUrl := "https://www.netflix.com/title/81280792"
 
 	content, resp := requestURL(netflixUrl, vs.proxy_url)
 
