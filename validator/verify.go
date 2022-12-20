@@ -17,11 +17,17 @@ func NewVerify(url string) *Ver {
 	return &Ver{url}
 }
 
-func requestURL(requrl string, proxy_url string) (string, *http.Response) {
+func requestURL(requrl string, proxy_url string, follow_redirect bool) (string, *http.Response) {
 	proxy, _ := url.Parse("http://" + proxy_url)
-	client := http.Client{
+	client := &http.Client{
 		Timeout: 5 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if follow_redirect {
+				return nil
+			}
 
+			return http.ErrUseLastResponse
+		},
 		Transport: &http.Transport{
 			// 设置代理
 			Proxy: http.ProxyURL(proxy),
@@ -47,7 +53,7 @@ func requestURL(requrl string, proxy_url string) (string, *http.Response) {
 func (vs *Ver) Netflix() string {
 	netflixUrl := "https://www.netflix.com/title/81280792"
 
-	content, resp := requestURL(netflixUrl, vs.proxy_url)
+	content, resp := requestURL(netflixUrl, vs.proxy_url, true)
 
 	if content == "Error" {
 		return "ERR"
@@ -68,7 +74,7 @@ func (vs *Ver) Netflix() string {
 
 func (vs *Ver) CustomProbe(custom_url string) string {
 
-	content, resp := requestURL(custom_url, vs.proxy_url)
+	content, resp := requestURL(custom_url, vs.proxy_url, true)
 
 	if content == "Error" {
 		return "ERR"

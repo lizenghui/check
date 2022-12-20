@@ -49,7 +49,7 @@ func getIpInfo() string {
 
 func requestURL(requrl string) string {
 	proxy, _ := url.Parse("http://" + proxy_url)
-	client := http.Client{
+	client := &http.Client{
 		Timeout:       5 * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse },
 		Transport: &http.Transport{
