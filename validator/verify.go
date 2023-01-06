@@ -21,19 +21,18 @@ func requestURL(requrl string, proxy_url string, follow_redirect bool) (string, 
 	proxy, _ := url.Parse("http://" + proxy_url)
 	client := &http.Client{
 		Timeout: 5 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if follow_redirect {
-				return nil
-			}
 
-			return http.ErrUseLastResponse
-		},
 		Transport: &http.Transport{
 			// 设置代理
 			Proxy: http.ProxyURL(proxy),
 		},
 	}
 
+	if !follow_redirect {
+		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+	}
 	req, _ := http.NewRequest("GET", requrl, nil)
 
 	req.Header.Set("USER-AGENT", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36")
