@@ -77,12 +77,12 @@ func init() {
 
 	flag.StringVar(&args.config_path, "c", "config.yaml", "config file;")
 	flag.StringVar(&args.port, "p", "18081", "proxy port;")
-	flag.StringVar(&args.ctype, "t", "0", "check type; \n\t0:check netflix;\n\t1:check google&youtube premium US\n")
+	flag.StringVar(&args.ctype, "t", "0", "check type; \n\t0:check netflix;\n\t1:check google&youtube premium US\n\t2:check chatGPT\n")
 	flag.StringVar(&args.custom_url, "u", "", "custom probe url")
 
 	flag.Usage = func() {
 		flag.PrintDefaults()
-		fmt.Println("\ngenerate clash config:\ngoogle&youtube:\n----------\ngrep \"youtube:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort && echo \" \" && \\\ngrep \"google:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\nnetflix:\n----------\ngrep \"netflix:Y\" 0.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort")
+		fmt.Println("\ngenerate clash config:\ngoogle&youtube:\n----------\ngrep \"youtube:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort && echo \" \" && \\\ngrep \"google:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\nnetflix:\n----------\ngrep \"netflix:Y\" 0.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\nchatGPT:\n----------\ngrep \"chatGPT:Y\" 2.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort")
 	}
 	flag.Parse()
 
@@ -208,10 +208,15 @@ func main() {
 
 		if args.ctype == "1" {
 			res += "\tgoogle:" + google()
+
+			if re.MatchString(node) {
+				res += "\tyoutube:" + youtube_premium()
+			}
 		}
 
-		if re.MatchString(node) {
-			res += "\tyoutube:" + youtube_premium()
+		if args.ctype == "2" {
+			vs := validator.NewVerify(proxy_url)
+			res += "\tchatGPT:" + vs.ChatGPT()
 		}
 
 		logger.Printf("%s%s\t%s\n", str, res, ip)
