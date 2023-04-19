@@ -9,6 +9,10 @@ check google & youtube
 ```
 ./check -c <clash_config> -t 1
 ```
+check chatGPT
+```
+./check -c <clash_config> -t 2
+```
 
 generate clash config
 ```shell
@@ -16,6 +20,8 @@ grep "youtube:Y" 1.check.log | cut -f 1 | cut -d ":" -f 2 | sed 's/^/      -/g' 
  grep "google:Y" 1.check.log | cut -f 1 | cut -d ":" -f 2 | sed 's/^/      -/g' | sort
  
 grep "netflix:Y" 0.check.log | cut -f 1 | cut -d ":" -f 2 | sed 's/^/      -/g' | sort
+
+grep "chatGPT:Y" 2.check.log | cut -f 1 | cut -d ":" -f 2 | sed 's/^/      -/g' | sort
 ```
 
 
