@@ -42,7 +42,7 @@ func requestURL(requrl string, proxy_url string, follow_redirect bool) (string, 
 	// resp, err := client.Get("http://myexternalip.com/raw")
 	if err != nil {
 		//return errors.New(strings.ReplaceAll(err.Error(), newrequrl, requrl))
-
+		// fmt.Println(err)
 		return "Error", resp
 	}
 	defer resp.Body.Close()
