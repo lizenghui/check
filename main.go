@@ -10,18 +10,67 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/Dreamacro/clash/constant"
-	"github.com/Dreamacro/clash/hub/executor"
-	chttp "github.com/Dreamacro/clash/listener/http"
+	"github.com/metacubex/mihomo/adapter/inbound"
+	"github.com/metacubex/mihomo/component/nat"
+	mconfig "github.com/metacubex/mihomo/config"
+	"github.com/metacubex/mihomo/constant"
+	_ "github.com/metacubex/mihomo/hub/executor"
+	chttp "github.com/metacubex/mihomo/listener/http"
 )
 
-var proxy constant.Proxy
+type switchingTunnel struct {
+	natTable constant.NatTable
+
+	mu    sync.RWMutex
+	proxy constant.Proxy
+}
+
+func newSwitchingTunnel() *switchingTunnel {
+	return &switchingTunnel{natTable: nat.New()}
+}
+
+func (t *switchingTunnel) SetProxy(p constant.Proxy) {
+	t.mu.Lock()
+	t.proxy = p
+	t.mu.Unlock()
+}
+
+func (t *switchingTunnel) HandleTCPConn(conn net.Conn, metadata *constant.Metadata) {
+	t.mu.RLock()
+	p := t.proxy
+	t.mu.RUnlock()
+
+	if p == nil {
+		_ = conn.Close()
+		return
+	}
+
+	remote, err := p.DialContext(context.Background(), metadata)
+	if err != nil {
+		_ = conn.Close()
+		return
+	}
+
+	relay(remote, conn)
+}
+
+func (t *switchingTunnel) HandleUDPPacket(packet constant.UDPPacket, _ *constant.Metadata) {
+	if packet != nil {
+		packet.Drop()
+	}
+}
+
+func (t *switchingTunnel) NatTable() constant.NatTable {
+	return t.natTable
+}
 
 type Args struct {
 	config_path, port, ctype, custom_url string
@@ -82,7 +131,7 @@ func init() {
 
 	flag.Usage = func() {
 		flag.PrintDefaults()
-		fmt.Println("\ngenerate clash config:\ngoogle&youtube:\n----------\ngrep \"youtube:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort && echo \" \" && \\\ngrep \"google:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\nnetflix:\n----------\ngrep \"netflix:Y\" 0.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\nchatGPT:\n----------\ngrep \"chatGPT:Y\" 2.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort")
+		fmt.Println("\ngenerate mihomo config:\ngoogle&youtube:\n----------\ngrep \"youtube:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort && echo \" \" && \\\ngrep \"google:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\nnetflix:\n----------\ngrep \"netflix:Y\" 0.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\nchatGPT:\n----------\ngrep \"chatGPT:Y\" 2.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort")
 	}
 	flag.Parse()
 
@@ -132,6 +181,40 @@ func google() string {
 	}
 }
 
+func parseMihomoConfigWithoutRules(path string) (map[string]constant.Proxy, error) {
+	buf, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	rawCfg, err := mconfig.UnmarshalRawConfig(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	// This project only needs outbound proxies to dial probe requests.
+	// Skip rules / rule-providers / GEOIP related parsing to avoid triggering GeoIP MMDB downloads.
+	rawCfg.RuleProvider = nil
+	rawCfg.Rule = nil
+	rawCfg.SubRules = nil
+
+	// DNS parsing may initialize GEOIP fallback filters in some configs; disable it here.
+	rawCfg.DNS.Enable = false
+	rawCfg.DNS.Fallback = nil
+	rawCfg.DNS.FallbackFilter.GeoIP = false
+
+	if len(rawCfg.DNS.DefaultNameserver) == 0 {
+		rawCfg.DNS.DefaultNameserver = []string{"114.114.114.114"}
+	}
+
+	cfg, err := mconfig.ParseRawConfig(rawCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return cfg.Proxies, nil
+}
+
 func main() {
 	_, err := os.Stat(args.config_path)
 
@@ -141,41 +224,30 @@ func main() {
 		os.Exit(1)
 	}
 
-	config, err := executor.ParseWithPath(args.config_path)
-
+	nodes, err := parseMihomoConfigWithoutRules(args.config_path)
 	if err != nil {
 		fmt.Printf("%s\n", err.Error())
 		os.Exit(1)
 	}
 
-	in := make(chan constant.ConnContext, 100)
-	defer close(in)
-	l, err := chttp.New(proxy_url, in)
+	// Allow local connections to the embedded HTTP proxy listener.
+	// Mihomo's default HTTP listener applies inbound IP filters via adapter/inbound globals.
+	inbound.SetAllowedIPs([]netip.Prefix{
+		netip.MustParsePrefix("127.0.0.1/32"),
+		netip.MustParsePrefix("::1/128"),
+	})
+	inbound.SetDisAllowedIPs(nil)
+
+	tunnel := newSwitchingTunnel()
+
+	l, err := chttp.New(proxy_url, tunnel)
 	if err != nil {
 		panic(err)
 	}
 	defer l.Close()
 	println("listen at:", l.Address())
 
-	go func() {
-		for c := range in {
-			conn := c
-			metadata := conn.Metadata()
-			go func() {
-				remote, err := proxy.DialContext(context.Background(), metadata)
-
-				if err != nil {
-					conn.Conn().Close()
-					// fmt.Println(err.Error())
-					return
-				}
-				relay(remote, conn.Conn())
-			}()
-		}
-	}()
-
 	index := 1
-	nodes := config.Proxies
 
 	// total := len(nodes)
 
@@ -188,7 +260,7 @@ func main() {
 		if server.Type() != constant.Shadowsocks && server.Type() != constant.ShadowsocksR && server.Type() != constant.Snell && server.Type() != constant.Socks5 && server.Type() != constant.Http && server.Type() != constant.Vmess && server.Type() != constant.Trojan {
 			continue
 		}
-		proxy = server
+		tunnel.SetProxy(server)
 
 		//落地机IP
 		ip := getIpInfo()
@@ -208,10 +280,8 @@ func main() {
 
 		if args.ctype == "1" {
 			res += "\tgoogle:" + google()
+			res += "\tyoutube:" + youtube_premium()
 
-			if re.MatchString(node) {
-				res += "\tyoutube:" + youtube_premium()
-			}
 		}
 
 		if args.ctype == "2" {
