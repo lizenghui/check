@@ -13,6 +13,8 @@ type Ver struct {
 	proxy_url string
 }
 
+const requestTimeout = 3 * time.Second
+
 func NewVerify(url string) *Ver {
 
 	return &Ver{url}
@@ -21,7 +23,7 @@ func NewVerify(url string) *Ver {
 func requestURL(requrl string, proxy_url string, follow_redirect bool) (string, *http.Response) {
 	proxy, _ := url.Parse("http://" + proxy_url)
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: requestTimeout,
 
 		Transport: &http.Transport{
 			// 设置代理
@@ -92,6 +94,64 @@ func (vs *Ver) ChatGPT() string {
 		return "N"
 	}
 
+}
+
+func geminiUnavailable(content string) bool {
+	content = strings.ToLower(content)
+	keywords := []string{
+		"gemini isn't available in your country",
+		"gemini is not available in your country",
+		"gemini isn't available in your region",
+		"gemini is not available in your region",
+		"not available in your country",
+		"not available in your region",
+		"not supported in your country",
+		"not supported in your region",
+	}
+	for _, k := range keywords {
+		if strings.Contains(content, k) {
+			return true
+		}
+	}
+	return false
+}
+
+func (vs *Ver) Gemini() string {
+	geminiUrl := "https://gemini.google.com/app"
+
+	content, resp := requestURL(geminiUrl, vs.proxy_url, false)
+
+	if content == "Error" || resp == nil {
+		return "ERR"
+	}
+
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		loc := strings.ToLower(resp.Header.Get("Location"))
+		if strings.Contains(loc, "/sorry/") || strings.Contains(loc, "google.com/sorry") {
+			return "N"
+		}
+		if strings.Contains(loc, "unsupported") || strings.Contains(loc, "unavailable") || strings.Contains(loc, "not-available") {
+			return "N"
+		}
+		return "Y"
+	}
+
+	if resp.StatusCode == 403 || resp.StatusCode == 429 || resp.StatusCode == 451 {
+		return "N"
+	}
+
+	if resp.StatusCode == 200 {
+		if geminiUnavailable(content) {
+			return "N"
+		}
+		return "Y"
+	}
+
+	if resp.StatusCode == 401 {
+		return "Y"
+	}
+
+	return "N"
 }
 
 func (vs *Ver) CustomProbe(custom_url string) string {

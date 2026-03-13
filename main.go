@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/netip"
@@ -82,6 +83,8 @@ var proxy_url = "127.0.0.1:"
 var fw os.File
 var logger *log.Logger
 
+const requestTimeout = 3 * time.Second
+
 func relay(l, r net.Conn) {
 	go io.Copy(l, r)
 	io.Copy(r, l)
@@ -99,7 +102,7 @@ func getIpInfo() string {
 func requestURL(requrl string) string {
 	proxy, _ := url.Parse("http://" + proxy_url)
 	client := &http.Client{
-		Timeout:       5 * time.Second,
+		Timeout:       requestTimeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse },
 		Transport: &http.Transport{
 			// 设置代理
@@ -126,12 +129,12 @@ func init() {
 
 	flag.StringVar(&args.config_path, "c", "config.yaml", "config file;")
 	flag.StringVar(&args.port, "p", "18081", "proxy port;")
-	flag.StringVar(&args.ctype, "t", "0", "check type; \n\t0:check netflix;\n\t1:check google&youtube premium US\n\t2:check chatGPT\n")
+	flag.StringVar(&args.ctype, "t", "0", "check type; \n\t0:check netflix;\n\t1:check google&youtube&gemini premium US\n\t2:check chatGPT\n\t3:check gemini\n")
 	flag.StringVar(&args.custom_url, "u", "", "custom probe url")
 
 	flag.Usage = func() {
 		flag.PrintDefaults()
-		fmt.Println("\ngenerate mihomo config:\ngoogle&youtube:\n----------\ngrep \"youtube:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort && echo \" \" && \\\ngrep \"google:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\nnetflix:\n----------\ngrep \"netflix:Y\" 0.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\nchatGPT:\n----------\ngrep \"chatGPT:Y\" 2.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort")
+		fmt.Println("\ngenerate mihomo config:\ngoogle&youtube&gemini:\n----------\ngrep \"youtube:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort && echo \" \" && \\\ngrep \"google:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort && echo \" \" && \\\ngrep \"gemini:Y\" 1.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\nnetflix:\n----------\ngrep \"netflix:Y\" 0.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\nchatGPT:\n----------\ngrep \"chatGPT:Y\" 2.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort\n----------\ngemini:\n----------\ngrep \"gemini:Y\" 3.check.log | cut -f 1 | cut -d \":\" -f 2 | sed 's/^/      -/g' | sort")
 	}
 	flag.Parse()
 
@@ -142,6 +145,8 @@ func init() {
 
 	fw, _ := os.OpenFile(args.ctype+".check.log", os.O_TRUNC|os.O_RDWR|os.O_CREATE, 0666)
 	logger = log.New(io.MultiWriter(os.Stdout, fw), "", 0)
+
+	rand.Seed(time.Now().UnixNano())
 }
 
 func youtube_premium() string {
@@ -252,6 +257,7 @@ func main() {
 	// total := len(nodes)
 
 	for node, server := range nodes {
+		start := time.Now()
 
 		var (
 			res string
@@ -262,9 +268,10 @@ func main() {
 		}
 		tunnel.SetProxy(server)
 
-		//落地机IP
-		ip := getIpInfo()
-		str := fmt.Sprintf("%d.node: %s", index, node)
+		var (
+			ip  string
+			str = fmt.Sprintf("%d.node: %s", index, node)
+		)
 
 		if args.custom_url != "" {
 			vs := validator.NewVerify(proxy_url)
@@ -279,17 +286,56 @@ func main() {
 		}
 
 		if args.ctype == "1" {
-			res += "\tgoogle:" + google()
-			res += "\tyoutube:" + youtube_premium()
+			vs := validator.NewVerify(proxy_url)
 
+			var (
+				wg         sync.WaitGroup
+				googleRes  string
+				youtubeRes string
+				geminiRes  string
+			)
+
+			wg.Add(4)
+			go func() {
+				defer wg.Done()
+				time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
+				googleRes = google()
+			}()
+			go func() {
+				defer wg.Done()
+				time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
+				youtubeRes = youtube_premium()
+			}()
+			go func() {
+				defer wg.Done()
+				time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
+				geminiRes = vs.Gemini()
+			}()
+			go func() {
+				defer wg.Done()
+				ip = getIpInfo()
+			}()
+			wg.Wait()
+
+			res += "\tgoogle:" + googleRes
+			res += "\tyoutube:" + youtubeRes
+			res += "\tgemini:" + geminiRes
+		} else {
+			// 落地机IP
+			ip = getIpInfo()
 		}
 
 		if args.ctype == "2" {
 			vs := validator.NewVerify(proxy_url)
 			res += "\tchatGPT:" + vs.ChatGPT()
 		}
+		if args.ctype == "3" {
+			vs := validator.NewVerify(proxy_url)
+			res += "\tgemini:" + vs.Gemini()
+		}
 
-		logger.Printf("%s%s\t%s\n", str, res, ip)
+		cost := time.Since(start).Milliseconds()
+		logger.Printf("%s%s\tcost:%dms\t%s\n", str, res, cost, ip)
 
 		index++
 	}
