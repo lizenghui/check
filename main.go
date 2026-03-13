@@ -86,8 +86,14 @@ var logger *log.Logger
 const requestTimeout = 3 * time.Second
 
 func relay(l, r net.Conn) {
-	go io.Copy(l, r)
-	io.Copy(r, l)
+	go func() {
+		io.Copy(l, r)
+		l.Close()
+	}()
+	go func() {
+		io.Copy(r, l)
+		r.Close()
+	}()
 }
 
 func getIpInfo() string {
